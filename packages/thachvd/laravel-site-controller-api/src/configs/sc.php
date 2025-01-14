@@ -1,0 +1,40 @@
+<?php
+
+return [
+    'tllincoln_api' => [
+        'date_format' => 'y-m-d',
+        'time_format' => 'h:i:s',
+        'url_get_empty_room_series' => 'roomandplaninquirysalesstsservice',
+        'url_get_empty_room' => 'roomandplaninquirysalesstsservice',
+        'url_get_plan_price' => 'roomandplaninquirysalesstsservice',
+        'url_get_plan_price_series' => 'roomandplaninquiryanyunitpricesalesstsservice',
+        'url_check_pre_booking' => 'reservationcontrolservice',
+        'url_entry_booking' => 'reservationcontrolservice',
+        'url_cancel_booking' => 'reservationcontrolservicewithcp',
+        'command_cancel_booking' => 'deletebookingwithcp',
+        'get_empty_room_max_day' => 30,
+        'tllincoln_date_format_api' => 'ymd',
+        'system_format_time' => 'h:m:s',
+        'empty_room_max_month' => 13,
+        'naif_xml_version' => [
+            'naif_3000' => 3000,
+        ],
+        'result_code_xml' => [
+            'success' => 'true',
+            'fail' => 'false',
+        ],
+        'mapping_plan_tllincoln' => 0,
+        'not_mapping_plan_tllincoln' => 1,
+        'sales_office_code_btob' => 1001,
+        'sales_office_code_fit' => 1002,
+        'sales_office_code_staynavi_local' => 1003,
+        'sales_office_name' => 'staynavi booking',
+        'sales_office_name_staynavi_local' => 'staynavi local',
+        'booking_plan_invalid' => '*(条件範囲外)',
+        'fit_sc_tllincoln_agt_id' => env('fit_sc_tllincoln_agt_id'),
+        'fit_sc_tllincoln_agt_password' => env('fit_sc_tllincoln_agt_password'),
+        'btob_sc_tllincoln_agt_id' => env('btob_sc_tllincoln_agt_id'),
+        'btob_sc_tllincoln_agt_password' => env('btob_sc_tllincoln_agt_password'),
+        'using_plan_tllincoln' => 0,
+    ],
+];
