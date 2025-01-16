@@ -147,7 +147,7 @@ class TlLincolnService
      * @return array|\Illuminate\Http\JsonResponse
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function getPlanPrice(Request $request)
+    public function getPricePlan(Request $request)
     {
         $dateValidation = $this->validateAndParseDates($request);
         if (isset($dateValidation['success']) && !$dateValidation['success']) {
@@ -155,18 +155,23 @@ class TlLincolnService
         }
 
         $command = 'planPriceInfoAcquisition';
-        $this->setPlanPriceSoapRequest($dateValidation, $request);
+        // set body request
+        $this->setPricePlanSoapRequest($dateValidation, $request);
 
         try {
             $url      = config('sc.tllincoln_api.get_plan_price_url');
+            $soapApiLog = [
+                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
+                'url'     => $url,
+                'command' => $command,
+                "request" => $this->tlLincolnSoapClient->getBody(),
+            ];
             $response = $this->tlLincolnSoapClient->callSoapApi($url);
-
-
             $data    = [];
             $success = true;
 
             if ($response !== null) {
-                $arrPlans = $this->tLLincolnSoapClient->convertResponeToArray($response);
+                $arrPlans = $this->tlLincolnSoapClient->convertResponeToArray($response);
                 if (isset($arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'])) {
                     $data = $arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'];
                 }
@@ -174,26 +179,22 @@ class TlLincolnService
                 $success = false;
             }
 
-            $dataLog["is_success"] = $success;
-            $dataLog["response"]   = $response;
-
-            $this->log->createLog($dataLog);
+            $soapApiLog['response']   = $response;
+            $soapApiLog['is_success'] = $success;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
 
             return response()->json([
                 'success' => $success,
                 'data'    => $data,
             ]);
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
-
-            $dataLog["is_success"] = false;
-            $dataLog["response"]   = $e->getMessage();
-
-            $this->log->createLog($dataLog);
+        } catch (\Exception $e) {
+            $soapApiLog['response']   = $e->getMessage();
+            $soapApiLog['is_success'] = false;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
 
             return response()->json([
                 'success' => false,
-                'message' => [$e->getMessage()],
+                'message' => $e->getMessage()
             ]);
         }
     }
@@ -325,7 +326,7 @@ class TlLincolnService
      * @param Request $request
      * @return void
      */
-    public function setPlanPriceSoapRequest(array $dateValidation, Request $request): void
+    public function setPricePlanSoapRequest(array $dateValidation, Request $request): void
     {
         $startDay      = $dateValidation['startDay'];
         $endDay        = $dateValidation['endDay'];

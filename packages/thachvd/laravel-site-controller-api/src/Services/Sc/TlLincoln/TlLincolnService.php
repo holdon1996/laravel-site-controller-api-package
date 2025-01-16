@@ -1,10 +1,8 @@
 <?php
 
-namespace ThachVd\LaravelSiteControllerApi\Services\Sc\TlLincoln;
+namespace App\Services\Sc\TlLincoln;
 
 use App\Models\ScTlLincolnSoapApiLog;
-use App\Services\Sc\TlLincoln\TlLincolnSoapBody;
-use App\Services\Sc\TlLincoln\TlLincolnSoapClient;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -147,6 +145,63 @@ class TlLincolnService
     /**
      * @param Request $request
      * @return array|\Illuminate\Http\JsonResponse
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getPricePlan(Request $request)
+    {
+        $dateValidation = $this->validateAndParseDates($request);
+        if (isset($dateValidation['success']) && !$dateValidation['success']) {
+            return $dateValidation;
+        }
+
+        $command = 'planPriceInfoAcquisition';
+        // set body request
+        $this->setPricePlanSoapRequest($dateValidation, $request);
+
+        try {
+            $url      = config('sc.tllincoln_api.get_plan_price_url');
+            $soapApiLog = [
+                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
+                'url'     => $url,
+                'command' => $command,
+                "request" => $this->tlLincolnSoapClient->getBody(),
+            ];
+            $response = $this->tlLincolnSoapClient->callSoapApi($url);
+            $data    = [];
+            $success = true;
+
+            if ($response !== null) {
+                $arrPlans = $this->tlLincolnSoapClient->convertResponeToArray($response);
+                if (isset($arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'])) {
+                    $data = $arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'];
+                }
+            } else {
+                $success = false;
+            }
+
+            $soapApiLog['response']   = $response;
+            $soapApiLog['is_success'] = $success;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
+
+            return response()->json([
+                'success' => $success,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            $soapApiLog['response']   = $e->getMessage();
+            $soapApiLog['is_success'] = false;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * @param Request $request
+     * @return array|\Illuminate\Http\JsonResponse
      */
     private function validateAndParseDates(Request $request)
     {
@@ -263,6 +318,61 @@ class TlLincolnService
         ];
 
         $body = $this->tlLincolnSoapBody->generateBody('roomAvailabilityAllSalesSts', $dataRequest, null, $userInfo);
+        $this->tlLincolnSoapClient->setBody($body);
+    }
+
+    /**
+     * @param array $dateValidation
+     * @param Request $request
+     * @return void
+     */
+    public function setPricePlanSoapRequest(array $dateValidation, Request $request): void
+    {
+        $startDay      = $dateValidation['startDay'];
+        $endDay        = $dateValidation['endDay'];
+        $minPrice      = $request->input('min_price');
+        $maxPrice      = $request->input('max_price');
+        $perPaxCount   = $request->input('person_number');
+        $tllHotelCode  = $request->input('tllHotelCode');
+        $tllRmTypeCode = $request->input('tllRmTypeCode');
+        $tllPlanCode   = $request->input('tllPlanCode');
+        $tllPlanInfos  = [];
+        if (!is_array($tllPlanCode)) {
+            $tllPlanInfos['tllPlanCode'] = $tllPlanCode;
+        } else {
+            foreach ($tllPlanCode as $item) {
+                $tllPlanInfos[] = ['tllPlanCode' => $item];
+            }
+        }
+        if (!is_array($tllRmTypeCode)) {
+            $tllPlanInfos['tllRmTypeCode'] = $tllRmTypeCode;
+        } else {
+            foreach ($tllRmTypeCode as $item) {
+                $tllPlanInfos[] = ['tllRmTypeCode' => $item];
+            }
+        }
+
+        $dataRequest = [
+            'extractionRequest' => [
+                'startDay'    => $startDay,
+                'endDay'      => $endDay,
+                'minPrice'    => $minPrice,
+                'maxPrice'    => $maxPrice,
+                'perPaxCount' => $perPaxCount
+            ],
+            'hotelInfos'        => [
+                'tllHotelCode' => $tllHotelCode,
+                'tllPlanInfos' => $tllPlanInfos
+            ]
+        ];
+
+
+        $this->tlLincolnSoapBody->setMainBodyWrapSection('planPriceInfoAcquisitionRequest');
+        $userInfo = [
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password')
+        ];
+        $body     = $this->tlLincolnSoapBody->generateBody('planPriceInfoAcquisition', $dataRequest, null, $userInfo);
         $this->tlLincolnSoapClient->setBody($body);
     }
 }

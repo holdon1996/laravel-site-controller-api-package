@@ -60,8 +60,15 @@ class TlLincolnController extends Controller
      * @param Request $request
      * @return array|\Illuminate\Http\JsonResponse
      */
-    public function getPlanPrice(Request $request)
+    public function getPricePlan(Request $request)
     {
-        return $this->tlLincolnService->getPlanPrice($request);
+        // example request
+        // tllHotelCode: C77338
+        // tllPlanCode: 15303611
+        // tllRmTypeCode: 482
+        // person_number: 1
+        // date_from: 20250117
+        // date_to: 20250118
+        return $this->tlLincolnService->getPricePlan($request);
     }
 }
