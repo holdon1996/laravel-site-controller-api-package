@@ -81,7 +81,12 @@ class TlLincolnSoapClient
      */
     public function getBody()
     {
-        return $this->options['body'];
+        return $this->options['body'] ?? [];
+    }
+
+    public function getQueryParams()
+    {
+        return $this->options['query'] ?? [];
     }
 
     /**
@@ -103,11 +108,12 @@ class TlLincolnSoapClient
             $scApiLog                = [
                 'url'          => $url,
                 'method'       => $this->options['method'],
-                'request_body' => $this->options['body'],
+                'request_body' => $this->options['body'] ?? [],
             ];
             $scApiLog['status_code'] = $response->getStatusCode();
             $scApiLog['response']    = $response->getBody()->getContents();
         } catch (\GuzzleHttp\Exception\RequestException $e) {
+            dd($e);
             \Log::error('API connection failed - URL: ' . $url);
             \Log::error($e);
 

@@ -2,8 +2,12 @@
 
 namespace App\Services\Sc\TlLincoln;
 
+use App\Models\ScApiLog;
 use App\Models\ScTlLincolnSoapApiLog;
+use App\Services\Sc\Xml2Array\Xml2Array;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 
 /**
@@ -12,367 +16,303 @@ use Illuminate\Http\Request;
 class TlLincolnService
 {
     /**
-     * @var TlLincolnSoapClient
+     * @var Client
      */
-    protected $tlLincolnSoapClient;
+    protected $client;
     /**
-     * @var TlLincolnSoapBody
+     * @var array
      */
-    protected $tlLincolnSoapBody;
+    protected $headers = [];
+    /**
+     * @var array
+     */
+    protected $query_params = [];
+    /**
+     * @var array
+     */
+    protected $body = [];
 
     /**
-     * @param TlLincolnSoapClient $tlLincolnSoapClient
-     * @param TlLincolnSoapBody $tlLincolnSoapBody
+     * @param Client $client
      */
-    public function __construct(TlLincolnSoapClient $tlLincolnSoapClient, TlLincolnSoapBody $tlLincolnSoapBody)
+    public function __construct(Client $client)
     {
-        $this->tlLincolnSoapClient = $tlLincolnSoapClient;
-        $this->tlLincolnSoapBody   = $tlLincolnSoapBody;
+        $this->client = $client;
     }
 
     /**
-     * @param Request $request
-     * @return array|\Illuminate\Http\JsonResponse
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @param array $headers
+     * @return void
      */
-    public function getEmptyRoom(Request $request)
+    public function setHeaders(array $headers = [])
     {
-        $dateValidation = $this->validateAndParseDates($request);
-        if (isset($dateValidation['success']) && !$dateValidation['success']) {
-            return $dateValidation;
-        }
-
-        $command = 'roomAvailabilitySalesSts';
-        $this->setEmptyRoomSoapRequest($dateValidation, $request);
-
-        try {
-            $url        = config('sc.tllincoln_api.get_empty_room_url');
-            $soapApiLog = [
-                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
-                'url'     => $url,
-                'command' => $command,
-                "request" => $this->tlLincolnSoapClient->getBody(),
-            ];
-            $response   = $this->tlLincolnSoapClient->callSoapApi($url);
-
-            $data    = [];
-            $success = true;
-
-            if ($response !== null) {
-                $rooms = $this->tlLincolnSoapClient->convertResponeToArray($response);
-
-                if (isset($rooms['ns2:roomAvailabilitySalesStsResponse']['roomAvailabilitySalesStsResult']['hotelInfos'])) {
-                    $data = $rooms['ns2:roomAvailabilitySalesStsResponse']['roomAvailabilitySalesStsResult']['hotelInfos'];
-                }
-            } else {
-                $success = false;
-            }
-
-            $soapApiLog['response']   = $response;
-            $soapApiLog['is_success'] = $success;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => $success,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            $soapApiLog['response']   = $e->getMessage();
-            $soapApiLog['is_success'] = false;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ]);
-        }
+        $commonHeaders         = [
+            'Accept-Encoding' => 'gzip',
+            'Content-type'    => 'application/download',
+        ];
+        $this->client->headers = array_merge($commonHeaders, $headers);
     }
 
     /**
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @param array $query_params
+     * @return void
      */
-    public function getBulkEmptyRoom(Request $request)
+    protected function setQueryParams(array $query_params = [])
     {
-        $command = 'roomAvailabilityAllSalesSts';
-        $this->setBulkEmptyRoomSoapRequest($request);
-        try {
-            $url        = config('sc.tllincoln_api.get_empty_room_series_url');
-            $soapApiLog = [
-                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
-                'url'     => $url,
-                'command' => $command,
-                "request" => $this->tlLincolnSoapClient->getBody(),
-            ];
-
-            $response = $this->tlLincolnSoapClient->callSoapApi($url);
-
-            $data    = [];
-            $success = true;
-
-            if ($response !== null) {
-                $arrRooms = $this->tlLincolnSoapClient->convertResponeToArray($response);
-
-                if (isset($arrRooms['ns2:roomAvailabilityAllSalesStsResponse']['roomAvailabilityAllSalesStsResult']['hotelInfos'])) {
-                    $data = $arrRooms['ns2:roomAvailabilityAllSalesStsResponse']['roomAvailabilityAllSalesStsResult']['hotelInfos'];
-                }
-            } else {
-                $success = false;
-            }
-
-            $soapApiLog['response']   = $response;
-            $soapApiLog['is_success'] = $success;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => $success,
-                'data'    => $data,
-                'date'    => now()->format(config('sc.tllincoln_api.date_format')),
-            ]);
-        } catch (\Exception $e) {
-            $soapApiLog['response']   = $e->getMessage();
-            $soapApiLog['is_success'] = false;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ]);
-        }
+        $this->client->query_params = $query_params;
     }
 
     /**
-     * @param Request $request
-     * @return array|\Illuminate\Http\JsonResponse
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @param array $body
      */
-    public function getPricePlan(Request $request)
+    protected function setBody(array $body = [])
     {
-        $dateValidation = $this->validateAndParseDates($request);
-        if (isset($dateValidation['success']) && !$dateValidation['success']) {
-            return $dateValidation;
-        }
+        $commonBody         = [];
+        $this->client->body = array_merge($commonBody, $body);
+    }
 
-        $command = 'planPriceInfoAcquisition';
+    /**
+     * @return void
+     */
+    public function getMasterHotel()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_master_hotel'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password')
+        ];
+
+        // set header request
+        $this->setHeaders();
         // set body request
-        $this->setPricePlanSoapRequest($dateValidation, $request);
+        $this->setQueryParams($queryParams);
 
+        $url     = config('sc.tllincoln_api.get_master_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+    public function getMasterRoomType()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_master_room_type'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_master_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+    public function getMasterRoomTypeDiff()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_diff_master_room_type'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_partial_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+    public function getMasterPlan()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_master_plan'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_master_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+    public function getMasterPlanDiff()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_diff_master_plan'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_partial_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+
+    /**
+     * @param $content
+     * @return bool
+     */
+    public function isValidResponse($content)
+    {
+        // check response is text
+        return count(str_getcsv($content)) !== 1;
+    }
+
+    /**
+     * @param $method
+     * @param $url
+     * @param $query
+     * @param $formParams
+     * @return array|null
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function sendRequest($method, $url, $query, $formParams)
+    {
         try {
-            $url      = config('sc.tllincoln_api.get_plan_price_url');
-            $soapApiLog = [
-                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
-                'url'     => $url,
-                'command' => $command,
-                "request" => $this->tlLincolnSoapClient->getBody(),
-            ];
-            $response = $this->tlLincolnSoapClient->callSoapApi($url);
-            $data    = [];
-            $success = true;
+            $options            = [];
+            $options['headers'] = $this->headers;
 
-            if ($response !== null) {
-                $arrPlans = $this->tlLincolnSoapClient->convertResponeToArray($response);
-                if (isset($arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'])) {
-                    $data = $arrPlans['ns2:planPriceInfoAcquisitionResponse']['planPriceInfoResult']['hotelInfos'];
-                }
-            } else {
-                $success = false;
+            if (!is_null($query)) {
+                $options['query'] = $query;
+            }
+            if (!is_null($formParams)) {
+                $options['formParams'] = $formParams;
             }
 
-            $soapApiLog['response']   = $response;
-            $soapApiLog['is_success'] = $success;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => $success,
-                'data'    => $data,
-            ]);
+            $client                          = new Client();
+            $tlLincolnApiResponse['url']     = $url;
+            $tlLincolnApiResponse['method']  = $method;
+            $tlLincolnApiResponse['request'] = json_encode($options);
+            $response                        = $client->request($method, $url, $options);
         } catch (\Exception $e) {
-            $soapApiLog['response']   = $e->getMessage();
-            $soapApiLog['is_success'] = false;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ]);
+            \Log::error('command MasterHotelFromTlLincoln error: ' . $e->getMessage());
+            \Log::error($e);
+            $tlLincolnApiResponse['status_code'] = 500;
+            $tlLincolnApiResponse['response']    = $e->getMessage();
+            $this->writeLogDB($tlLincolnApiResponse);
+            return null;
         }
+        $fileName                            = null;
+        $tlLincolnApiResponse['status_code'] = $response->getStatusCode();
+        if ($response->getHeader('Content-Disposition')) {
+            $fileName = explode('filename=', $response->getHeader('Content-Disposition')[0])[1];
+        }
+        $tlLincolnApiResponse['response'] = $response->getBody()->getContents();
+        $tlLincolnApiResponse['response'] = trim(
+            mb_convert_encoding($tlLincolnApiResponse['response'], "UTF-8", "auto, SJIS-win")
+        );
+        $this->writeLogDB($tlLincolnApiResponse);
+        return [$fileName, $tlLincolnApiResponse['response']];
     }
 
     /**
-     * @param Request $request
-     * @return array|\Illuminate\Http\JsonResponse
+     * @param $logData
+     * @return void
      */
-    private function validateAndParseDates(Request $request)
+    public function writeLogDB($logData)
     {
-        $dateFormat = config('sc.tllincoln_api.tllincoln_date_format_api');
-        $dateFrom   = $request->input('date_from');
-        $dateTo     = $request->input('date_to');
         try {
-            $startDay  = $dateFrom ? Carbon::parse($dateFrom)->format($dateFormat) : Carbon::now()->format($dateFormat);
-            $endDay    = $dateTo ? Carbon::parse($dateTo)->format($dateFormat) : Carbon::parse($startDay)->addDay(
-                config('sc.tllincoln_api.get_empty_room_max_day')
-            )->format($dateFormat);
-            $endDayMax = Carbon::parse($startDay)->addDays(30)->format($dateFormat);
+            ScApiLog::create($logData);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'date input is not valid!'
-            ]);
+            dd($e);
+            \Log::error($e);
         }
-
-        $validator = \Validator::make($request->all(), [
-            'date_from' => ['nullable', 'date', 'date_format:' . $dateFormat],
-            'date_to'   => [
-                'nullable',
-                'date',
-                'date_format:' . $dateFormat,
-                'after_or_equal:date_from',
-                'before_or_equal:' . $endDayMax
-            ]
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()
-            ]);
-        }
-
-        return compact('startDay', 'endDay');
-    }
-
-    /**
-     * @param array $dateValidation
-     * @param Request $request
-     * @return void
-     */
-    public function setEmptyRoomSoapRequest(array $dateValidation, Request $request): void
-    {
-        $startDay       = $dateValidation['startDay'];
-        $endDay         = $dateValidation['endDay'];
-        $perRmPaxCount  = $request->input('person_number');
-        $tllHotelCode   = $request->input('tllHotelCode');
-        $tllRmTypeCode  = $request->input('tllRmTypeCode');
-        $tllRmTypeInfos = [];
-
-        if (!is_array($tllRmTypeCode)) {
-            $tllRmTypeInfos['tllRmTypeCode'] = $tllRmTypeCode;
-        } else {
-            foreach ($tllRmTypeCode as $item) {
-                $tllRmTypeInfos[] = ['tllRmTypeCode' => $item];
-            }
-        }
-
-        $dataRequest = [
-            'extractionRequest' => [
-                'startDay'      => $startDay,
-                'endDay'        => $endDay,
-                'perRmPaxCount' => $perRmPaxCount,
-            ],
-            'hotelInfos'        => [
-                'tllHotelCode'   => $tllHotelCode,
-                'tllRmTypeInfos' => $tllRmTypeInfos
-            ]
-        ];
-
-        $this->tlLincolnSoapBody->setMainBodyWrapSection('roomAvailabilitySalesStsRequest');
-        $userInfo = [
-            'agtId'       => config('sc.tllincoln_api.agt_id'),
-            'agtPassword' => config('sc.tllincoln_api.agt_password')
-        ];
-
-        $body = $this->tlLincolnSoapBody->generateBody('roomAvailabilitySalesSts', $dataRequest, null, $userInfo);
-        $this->tlLincolnSoapClient->setBody($body);
-    }
-
-    /**
-     * @param Request $request
-     * @return void
-     */
-    public function setBulkEmptyRoomSoapRequest(Request $request): void
-    {
-        $tllHotelCode   = $request->input('tllHotelCode');
-        $tllRmTypeCode  = $request->input('tllRmTypeCode');
-        $tllRmTypeInfos = [];
-
-        if (!is_array($tllRmTypeCode)) {
-            $tllRmTypeInfos['tllRmTypeCode'] = $tllRmTypeCode;
-        } else {
-            foreach ($tllRmTypeCode as $item) {
-                $tllRmTypeInfos[] = ['tllRmTypeCode' => $item];
-            }
-        }
-
-        $dataRequest = [
-            'hotelInfos' => [
-                'tllHotelCode'   => $tllHotelCode,
-                'tllRmTypeInfos' => $tllRmTypeInfos
-            ]
-        ];
-
-        $this->tlLincolnSoapBody->setMainBodyWrapSection('roomAvailabilityAllSalesStsRequest');
-        $userInfo = [
-            'agtId'       => config('sc.tllincoln_api.agt_id'),
-            'agtPassword' => config('sc.tllincoln_api.agt_password')
-        ];
-
-        $body = $this->tlLincolnSoapBody->generateBody('roomAvailabilityAllSalesSts', $dataRequest, null, $userInfo);
-        $this->tlLincolnSoapClient->setBody($body);
-    }
-
-    /**
-     * @param array $dateValidation
-     * @param Request $request
-     * @return void
-     */
-    public function setPricePlanSoapRequest(array $dateValidation, Request $request): void
-    {
-        $startDay      = $dateValidation['startDay'];
-        $endDay        = $dateValidation['endDay'];
-        $minPrice      = $request->input('min_price');
-        $maxPrice      = $request->input('max_price');
-        $perPaxCount   = $request->input('person_number');
-        $tllHotelCode  = $request->input('tllHotelCode');
-        $tllRmTypeCode = $request->input('tllRmTypeCode');
-        $tllPlanCode   = $request->input('tllPlanCode');
-        $tllPlanInfos  = [];
-        if (!is_array($tllPlanCode)) {
-            $tllPlanInfos['tllPlanCode'] = $tllPlanCode;
-        } else {
-            foreach ($tllPlanCode as $item) {
-                $tllPlanInfos[] = ['tllPlanCode' => $item];
-            }
-        }
-        if (!is_array($tllRmTypeCode)) {
-            $tllPlanInfos['tllRmTypeCode'] = $tllRmTypeCode;
-        } else {
-            foreach ($tllRmTypeCode as $item) {
-                $tllPlanInfos[] = ['tllRmTypeCode' => $item];
-            }
-        }
-
-        $dataRequest = [
-            'extractionRequest' => [
-                'startDay'    => $startDay,
-                'endDay'      => $endDay,
-                'minPrice'    => $minPrice,
-                'maxPrice'    => $maxPrice,
-                'perPaxCount' => $perPaxCount
-            ],
-            'hotelInfos'        => [
-                'tllHotelCode' => $tllHotelCode,
-                'tllPlanInfos' => $tllPlanInfos
-            ]
-        ];
-
-
-        $this->tlLincolnSoapBody->setMainBodyWrapSection('planPriceInfoAcquisitionRequest');
-        $userInfo = [
-            'agtId'       => config('sc.tllincoln_api.agt_id'),
-            'agtPassword' => config('sc.tllincoln_api.agt_password')
-        ];
-        $body     = $this->tlLincolnSoapBody->generateBody('planPriceInfoAcquisition', $dataRequest, null, $userInfo);
-        $this->tlLincolnSoapClient->setBody($body);
     }
 }

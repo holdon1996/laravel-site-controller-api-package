@@ -1,6 +1,6 @@
 <?php
 
-namespace ThachVd\LaravelSiteControllerApi\Models;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,16 +17,18 @@ class ScTlLincolnSoapApiLog extends Model
         'created_at',
     ];
 
+    public $timestamps = false;
+
     public static function createLog($data)
     {
         $dataId = self::genDataId();
         return self::create([
             'data_id'    => $dataId,
-            'endpoint'   => $data['endpoint'],
+            'url'   => $data['url'],
             'command'    => $data['command'],
             'is_success' => $data['is_success'],
-            'response'   => $data['response'],
             'request'    => $data['request'],
+            'response'   => $data['response'],
         ]);
     }
 

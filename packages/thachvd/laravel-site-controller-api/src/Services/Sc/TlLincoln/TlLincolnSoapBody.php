@@ -3,11 +3,21 @@
 namespace App\Services\Sc\TlLincoln;
 
 use App\Services\Sc\Array2Xml\Array2Xml;
+use Carbon\Carbon;
 
+/**
+ *
+ */
 class TlLincolnSoapBody
 {
+    /**
+     * @var mixed|string
+     */
     public $mainBodyWrapSection;
 
+    /**
+     * @param $mainBodyWrapSection
+     */
     public function __construct($mainBodyWrapSection = '')
     {
         $this->mainBodyWrapSection = $mainBodyWrapSection;
@@ -51,6 +61,11 @@ class TlLincolnSoapBody
         ];
     }
 
+    /**
+     * @param $section
+     * @param $naifVersion
+     * @return string
+     */
     private function wrapOpenSection($section, $naifVersion = null)
     {
         if ($naifVersion && $naifVersion == config('sc.tllincoln_api.naif_xml_version.naif_3000')) {
@@ -62,11 +77,22 @@ class TlLincolnSoapBody
         return '<soapenv:Envelope xmlns:soapenv=\'http://schemas.xmlsoap.org/soap/envelope/\' xmlns:naif=\'' . $xmlnsUrl . '\'><soapenv:Header/><soapenv:Body><naif:' . $section . '>';
     }
 
+    /**
+     * @param $section
+     * @return string
+     */
     private function wrapCloseSection($section)
     {
         return '</naif:' . $section . '></soapenv:Body></soapenv:Envelope>';
     }
 
+    /**
+     * @param $section
+     * @param $bodyRequest
+     * @param $naifVersion
+     * @param $userInfo
+     * @return string
+     */
     public function generateBody($section, $bodyRequest, $naifVersion = null, $userInfo)
     {
         $soapOpenSection  = $this->wrapOpenSection($section, $naifVersion);

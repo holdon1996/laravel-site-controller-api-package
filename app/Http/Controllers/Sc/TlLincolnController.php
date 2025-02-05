@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Sc;
 
 use App\Http\Controllers\Controller;
 use App\Models\ScTlLincolnSoapApiLog;
-use App\Services\Sc\TlLincoln\TlLincolnService;
+use App\Services\Sc\TlLincoln\TlLincolnSoapService;
 use App\Services\Sc\TlLincoln\TlLincolnSoapBody;
 use App\Services\Sc\TlLincoln\TlLincolnSoapClient;
 use Carbon\Carbon;
@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 class TlLincolnController extends Controller
 {
     /**
-     * @var TlLincolnService
+     * @var TlLincolnSoapService
      */
     protected $tlLincolnService;
 
@@ -24,7 +24,7 @@ class TlLincolnController extends Controller
      * @param TlLincolnSoapClient $tLLincolnSoapClient
      * @param TlLincolnSoapBody $tlLincolnSoapBody
      */
-    public function __construct(TlLincolnService $tlLincolnService)
+    public function __construct(TlLincolnSoapService $tlLincolnService)
     {
         $this->tlLincolnService = $tlLincolnService;
     }
@@ -70,5 +70,10 @@ class TlLincolnController extends Controller
         // date_from: 20250117
         // date_to: 20250118
         return $this->tlLincolnService->getPricePlan($request);
+    }
+
+    public function createBooking(Request $request)
+    {
+        return $this->tlLincolnService->createBooking($request);
     }
 }

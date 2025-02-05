@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ScApiLog extends Model
 {
-    protected $table = 'sc_api_log';
+    protected $table = 'sc_api_logs';
     protected $fillable = [
         'url',
         'method',
@@ -15,4 +15,6 @@ class ScApiLog extends Model
         'status_code',
         'created_at',
     ];
+
+    public $timestamps = false;
 }

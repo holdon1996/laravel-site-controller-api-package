@@ -15,4 +15,6 @@ class ScApiLog extends Model
         'status_code',
         'created_at',
     ];
+
+    public $timestamps = false;
 }
