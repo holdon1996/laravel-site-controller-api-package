@@ -72,8 +72,35 @@ class TlLincolnController extends Controller
         return $this->tlLincolnService->getPricePlan($request);
     }
 
+    /**
+     * @param Request $request
+     * @return array|\Illuminate\Http\JsonResponse
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getBulkPricePlan(Request $request)
+    {
+        // example request
+        // tllHotelCode: C77338
+        // tllPlanCode: 15303611
+        // tllRmTypeCode: 482
+        return $this->tlLincolnService->getBulkPricePlan($request);
+    }
+
+    /**
+     * @param Request $request
+     * @return null
+     */
     public function createBooking(Request $request)
     {
         return $this->tlLincolnService->createBooking($request);
+    }
+
+    /**
+     * @param Request $request
+     * @return void
+     */
+    public function cancelBooking(Request $request)
+    {
+        //TODO implement cancelBooking
     }
 }

@@ -3,12 +3,7 @@
 namespace App\Services\Sc\TlLincoln;
 
 use App\Models\ScApiLog;
-use App\Models\ScTlLincolnSoapApiLog;
-use App\Services\Sc\Xml2Array\Xml2Array;
-use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use GuzzleHttp\Client;
-use Illuminate\Http\Request;
 
 /**
  *
@@ -97,6 +92,7 @@ class TlLincolnService
             return;
         }
 
+        // TODO
         // upload s3
         //$fileContent = $this->s3Upload->process($fileName, $response);
 
@@ -108,6 +104,10 @@ class TlLincolnService
         //}
     }
 
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getMasterRoomType()
     {
         $queryParams = [
@@ -131,6 +131,7 @@ class TlLincolnService
             return;
         }
 
+        // TODO
         // upload s3
         //$fileContent = $this->s3Upload->process($fileName, $response);
 
@@ -142,6 +143,10 @@ class TlLincolnService
         //}
     }
 
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getMasterRoomTypeDiff()
     {
         $queryParams = [
@@ -165,6 +170,7 @@ class TlLincolnService
             return;
         }
 
+        // TODO
         // upload s3
         //$fileContent = $this->s3Upload->process($fileName, $response);
 
@@ -176,6 +182,10 @@ class TlLincolnService
         //}
     }
 
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getMasterPlan()
     {
         $queryParams = [
@@ -199,6 +209,7 @@ class TlLincolnService
             return;
         }
 
+        // TODO
         // upload s3
         //$fileContent = $this->s3Upload->process($fileName, $response);
 
@@ -210,6 +221,10 @@ class TlLincolnService
         //}
     }
 
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
     public function getMasterPlanDiff()
     {
         $queryParams = [
@@ -233,6 +248,7 @@ class TlLincolnService
             return;
         }
 
+        // TODO
         // upload s3
         //$fileContent = $this->s3Upload->process($fileName, $response);
 
@@ -244,6 +260,83 @@ class TlLincolnService
         //}
     }
 
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getFileCsvEmptyRoom()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_diff_empty_room'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_partial_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // TODO
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
+
+    /**
+     * @return void
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getFileCsvPlanPrice()
+    {
+        $queryParams = [
+            'fileType'    => config('sc.tllincoln_api.api_file_type_const.file_diff_price_plan'),
+            'searchType'  => config('sc.tllincoln_api.api_search_type_const.new'),
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password'),
+        ];
+
+        // set header request
+        $this->setHeaders();
+        // set body request
+        $this->setQueryParams($queryParams);
+
+        $url     = config('sc.tllincoln_api.get_partial_url');
+        $success = true;
+        [$fileName, $response] = $this->sendRequest("POST", $url, $this->query_params, $this->body);
+        dd($queryParams, $response);
+        if (!$this->isValidResponse($response)) {
+            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
+            return;
+        }
+
+        // TODO
+        // upload s3
+        //$fileContent = $this->s3Upload->process($fileName, $response);
+
+        // import to db
+        //if ($fileContent) {
+        //    $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
+        //} else {
+        //    $this->log->error('Create CSV GetMasterHotel in S3 failed');
+        //}
+    }
 
     /**
      * @param $content

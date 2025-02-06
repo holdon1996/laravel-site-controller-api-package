@@ -32,64 +32,6 @@ class TlLincolnSoapService
         $this->tlLincolnSoapBody   = $tlLincolnSoapBody;
     }
 
-    public function getMasterHotelDaily()
-    {
-        $queryParams = [
-            'fileType' => config('sc.TLLINCOLN.API_FILE_TYPE_CONST.FILE_MASTER_HOTEL'),
-            'searchType' => config('sc.TLLINCOLN.API_SEARCH_TYPE_CONST.NEW'),
-            'agtId'       => config('sc.tllincoln_api.agt_id'),
-            'agtPassword' => config('sc.tllincoln_api.agt_password')
-        ];
-
-        // set header request
-        $this->tlLincolnSoapClient->setHeaders();
-        // set body request
-        $this->tlLincolnSoapClient->setQueryParams($queryParams);
-        try {
-            $url = env('SC_TLLINCOLN_MASTER_DOWNLOAD_URL');
-            $success = true;
-            $response   = $this->tlLincolnSoapClient->callSoapApi($url);
-            if (!$this->isValidResponse($response)) {
-                \Log::info('not exist file master hotel from TL Lincoln at ' . now());
-                return;
-            }
-
-            $fileName = null;
-            $soapApiLog['status_code'] = $response->getStatusCode();
-            if ($response->getHeader('Content-Disposition')) {
-                $fileName = explode('filename=', $response->getHeader('Content-Disposition')[0])[1] ?? null;
-            }
-            $soapApiLog['response'] = $response->getBody()->getContents();
-            $soapApiLog['response'] = trim(mb_convert_encoding($soapApiLog['response'], "UTF-8", "auto, SJIS-win"));
-            $soapApiLog['is_success'] = $success;
-            ScTlLincolnSoapApiLog::createLog($soapApiLog);
-        } catch (\Exception $e) {
-            $success = false;
-
-
-        }
-        [$fileName, $response] = $this->client->downloadMaster();
-        $fileName = "{$typeTllPointOfSale}_{$fileName}";
-
-        $checkStatus = $this->checkStatusApi($response);
-        if (!$checkStatus) {
-            \Log::info('not exist file master hotel from TL Lincoln at ' . now());
-            return;
-        }
-        $fileContent = $this->s3Upload->process($fileName, $response);
-        if ($fileContent) {
-            $this->importDB->importMasterHotel($fileContent, $typeTllPointOfSale);
-        } else {
-            $this->log->error('Create CSV GetMasterHotel in S3 failed');
-        }
-    }
-
-    public function isValidResponse($content)
-    {
-        // check response is text
-        return count(str_getcsv($content)) !== 1;
-    }
-
     /**
      * @param Request $request
      * @return array|\Illuminate\Http\JsonResponse
@@ -267,14 +209,76 @@ class TlLincolnSoapService
         }
     }
 
+    /**
+     * @param Request $request
+     * @return array|\Illuminate\Http\JsonResponse
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getBulkPricePlan(Request $request)
+    {
+        $command = 'planPriceInfoAcquisitionAll';
+        // set header request
+        $this->tlLincolnSoapClient->setHeaders();
+        // set body request
+        $this->setBulkPricePlanSoapRequest($request);
+
+        try {
+            $url        = config('sc.tllincoln_api.get_plan_price_series_url');
+            $soapApiLog = [
+                'data_id' => ScTlLincolnSoapApiLog::genDataId(),
+                'url'     => $url,
+                'command' => $command,
+                "request" => $this->tlLincolnSoapClient->getBody(),
+            ];
+            $response   = $this->tlLincolnSoapClient->callSoapApi($url);
+            $data       = [];
+            $success    = true;
+
+            if ($response !== null) {
+                $arrPrices = $this->tlLincolnSoapClient->convertResponeToArray($response);
+                if (isset($arrPrices['ns2:planPriceInfoAcquisitionAllResponse']['planPriceInfoAllResult']['hotelInfos'])) {
+                    $data = $arrPrices['ns2:planPriceInfoAcquisitionAllResponse']['planPriceInfoAllResult']['hotelInfos'];
+                }
+            } else {
+                $success = false;
+            }
+
+            $soapApiLog['response']   = $response;
+            $soapApiLog['is_success'] = $success;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
+
+            return response()->json([
+                'success' => $success,
+                'data'    => $data,
+                'date' => now()->format(config('sc.tllincoln_api.DATE_FORMAT')),
+            ]);
+        } catch (\Exception $e) {
+            $soapApiLog['response']   = $e->getMessage();
+            $soapApiLog['is_success'] = false;
+            ScTlLincolnSoapApiLog::createLog($soapApiLog);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
     public function createBooking(Request $request)
     {
+        // precheck create booking
         $preCheckBookingResponse = $this->preCheckCreateBooking($request);
+        //TODO check preCheckBookingResponse success
+
+        // entry booking
+        $entryBookingResponse = $this->entryBooking($request);
+        // TODO check entryBookingResponse success
+        // TODO return response to client
     }
 
     public function preCheckCreateBooking(Request $request)
     {
-        $url     = config('sc.tllincoln_api.url_check_pre_booking');
+        $url     = config('sc.tllincoln_api.check_pre_booking_url');
         $command = 'preBooking';
 
         $response = $this->processBooking($url, $command, $request);
@@ -284,7 +288,7 @@ class TlLincolnSoapService
 
     public function entryBooking(Request $request)
     {
-        $url     = config('sc.tllincoln_api.url_entry_booking');
+        $url     = config('sc.tllincoln_api.entry_booking_url');
         $command = 'entryBooking';
 
         $response = $this->processBooking($url, $command, $request);
@@ -314,12 +318,12 @@ class TlLincolnSoapService
 
                 if (!$success) {
                     if (isset($commonResponse['errorInfos']['errorMsg'])) {
-                        array_push($message, $commonResponse['errorInfos']['errorMsg']);
+                        $message[] = $commonResponse['errorInfos']['errorMsg'];
                         \Log::info("Meet TLL Error Code {$commonResponse['errorInfos']['errorCode']}");
                         $data["errorCode"] = $commonResponse['errorInfos']['errorCode'];
                     } else {
                         foreach ($commonResponse['errorInfos'] as $error) {
-                            array_push($message, $error['errorMsg']);
+                            $message[] = $error['errorMsg'];
                         }
                     }
                 } else {
@@ -811,6 +815,45 @@ class TlLincolnSoapService
             'agtPassword' => config('sc.tllincoln_api.agt_password')
         ];
         $body     = $this->tlLincolnSoapBody->generateBody('planPriceInfoAcquisition', $dataRequest, null, $userInfo);
+        $this->tlLincolnSoapClient->setBody($body);
+    }
+
+    public function setBulkPricePlanSoapRequest(Request $request): void
+    {
+        $tllHotelCode  = $request->input('tllHotelCode');
+        $tllRmTypeCode = $request->input('tllRmTypeCode');
+        $tllPlanCode   = $request->input('tllPlanCode');
+        $dateNow       = Carbon::now();
+
+        $tllRmTypeInfos = [];
+        if (!is_array($tllRmTypeCode)) {
+            $tllRmTypeInfos['tllRmTypeCode'] = $tllRmTypeCode;
+            $tllRmTypeInfos['tllPlanCode']   = $tllPlanCode;
+        } else {
+            foreach ($tllRmTypeCode as $item) {
+                $tllRmTypeInfos[] = ['tllRmTypeCode' => $item, 'tllPlanCode' => $tllPlanCode];
+            }
+        }
+
+        $dataRequest = [
+            'hotelInfos' => [
+                'tllHotelCode' => $tllHotelCode,
+                'tllPlanInfos' => $tllRmTypeInfos
+            ]
+        ];
+
+
+        $this->tlLincolnSoapBody->setMainBodyWrapSection('planPriceInfoAcquisitionAllRequest');
+        $userInfo = [
+            'agtId'       => config('sc.tllincoln_api.agt_id'),
+            'agtPassword' => config('sc.tllincoln_api.agt_password')
+        ];
+        $body     = $this->tlLincolnSoapBody->generateBody(
+            'planPriceInfoAcquisitionAll',
+            $dataRequest,
+            null,
+            $userInfo
+        );
         $this->tlLincolnSoapClient->setBody($body);
     }
 }

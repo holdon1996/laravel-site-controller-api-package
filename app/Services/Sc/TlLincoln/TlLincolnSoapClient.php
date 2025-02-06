@@ -84,6 +84,9 @@ class TlLincolnSoapClient
         return $this->options['body'] ?? [];
     }
 
+    /**
+     * @return array|mixed
+     */
     public function getQueryParams()
     {
         return $this->options['query'] ?? [];

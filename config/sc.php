@@ -43,11 +43,8 @@ return [
         ],
         'mapping_plan_tllincoln' => 0,
         'not_mapping_plan_tllincoln' => 1,
-        'sales_office_code_btob' => 1001, //TODO change
-        'sales_office_code_fit' => 1002, //TODO change
-        'sales_office_code_staynavi_local' => 1003, //TODO change
-        'sales_office_name' => 'staynavi booking', //TODO change
-        'sales_office_name_staynavi_local' => 'staynavi local', //TODO change
+        'sales_office_code' => 1001, //TODO change
+        'sales_office_name' => 'Test', //TODO change
         'using_plan_tllincoln' => 0,
     ],
 ];
