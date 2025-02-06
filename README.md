@@ -34,7 +34,7 @@ in Laravel old version maybe you need to add service provider to config/app.php
 run command:
 ```php artisan vendor:publish --provider="ThachVd\LaravelSiteControllerApi\SiteControllerApiServiceProvider" ```
 
-In Laravel new version, you need add this code in file config/app.php
+In Laravel new version, you need add this code in file bootstrap/app.php
 ```
 then: function() {
     \Illuminate\Support\Facades\Route::middleware('api')
