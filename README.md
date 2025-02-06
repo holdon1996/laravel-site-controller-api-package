@@ -23,7 +23,7 @@ Add this config to your composer.json file
 ]
 ```
 then install the package via composer:
-``` composer require thachvd/laravel-site-controller-api ```
+``` composer require thachvd/laravel-site-controller-api:dev-main ```
 
 in Laravel old version maybe you need to add service provider to config/app.php
 ```
