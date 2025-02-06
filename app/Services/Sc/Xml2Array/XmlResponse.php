@@ -5,7 +5,7 @@ namespace App\Services\Sc\Xml2Array;
 use ArrayAccess;
 use ArrayIterator;
 use IteratorAggregate;
-use App\Service\Sc\Xml2Array\Exceptions\CollectionsNotFoundException;
+use App\Services\Sc\Xml2Array\Exceptions\CollectionsNotFoundException;
 use RecursiveIterator;
 use Traversable;
 

@@ -2,7 +2,7 @@
 
 namespace App\Services\Sc\Xml2Array;
 
-use App\Service\Sc\Xml2Array\Exceptions\IncorrectFormatException;
+use App\Services\Sc\Xml2Array\Exceptions\IncorrectFormatException;
 use DOMDocument;
 
 class Xml2Array
