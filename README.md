@@ -71,3 +71,5 @@ In Laravel old version, you need add code to RouteServiceProvider.php
 
 run command:
 ```php artisan migrate ```
+Add env key and value from packages/thachvd/laravel-site-controller-api/src/.env.example to .env
+
