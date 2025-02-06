@@ -12,8 +12,8 @@ class ScApiGenerateModels extends Command
 
     public function handle()
     {
-        $models = ['ScApiLog']; // Các model cần tạo
-        $modelPath = app_path('Models'); // Đường dẫn model (app/Models)
+        $models = ['ScApiLog']; // models need create
+        $modelPath = app_path('Models'); // models path (app/Models)
 
         if (!File::exists($modelPath)) {
             File::makeDirectory($modelPath, 0755, true);

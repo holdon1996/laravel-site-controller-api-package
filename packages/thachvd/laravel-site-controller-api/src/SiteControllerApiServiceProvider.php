@@ -50,7 +50,6 @@ class SiteControllerApiServiceProvider extends ServiceProvider
                 }
             }
 
-
             // publish routes
             $publishedRoutesPath = base_path('routes/sc.php');
             if (!file_exists($publishedRoutesPath)) {
