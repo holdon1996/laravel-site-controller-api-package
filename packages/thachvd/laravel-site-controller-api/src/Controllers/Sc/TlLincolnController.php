@@ -1,13 +1,11 @@
 <?php
 
-namespace ThachVd\LaravelSiteControllerApi\Controllers\Sc;
+namespace App\Http\Controllers\Sc;
 
 use App\Http\Controllers\Controller;
-use App\Models\ScTlLincolnSoapApiLog;
-use App\Services\Sc\TlLincoln\TlLincolnSoapService;
 use App\Services\Sc\TlLincoln\TlLincolnSoapBody;
 use App\Services\Sc\TlLincoln\TlLincolnSoapClient;
-use Carbon\Carbon;
+use App\Services\Sc\TlLincoln\TlLincolnSoapService;
 use Illuminate\Http\Request;
 
 /**
